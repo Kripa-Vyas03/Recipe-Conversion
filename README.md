@@ -19,11 +19,13 @@ This is a lightweight Python tool for converting recipe ingredient units between
   - Exclude specific ingredients from conversion
 
 ## Repository Structure
+```
 ├── convert_recipe.py                          # Core conversion functions
 ├── king_arthur_ingredient_weights2.csv        # Ingredient conversion table
 ├── chocolate_pan_cake_weight.txt              # example recipe in weight measurements
 ├── chocolate_pan_cake_volume.txt              # example recipe in volume measurements
 └── README.md
+```
 
 ## Ingredient conversion data
 The file king_arthur_ingredient_weights2.csv contains conversion factors for each ingredient, sourced from https://www.kingarthurbaking.com/learn/ingredient-weight-chart
@@ -36,10 +38,13 @@ Note that:
 
 
 #### Columns:
-INGREDIENT          Ingredient name (UPPERCASE)
-GRAMS_PER_CUP
-GRAMS_PER_TBSP
-GRAMS_PER_TSP
+| Column Name    | Description                 |
+| -------------- | --------------------------- |
+| INGREDIENT     | Ingredient name (UPPERCASE) |
+| GRAMS_PER_CUP  | Grams per cup               |
+| GRAMS_PER_TBSP | Grams per tablespoon        |
+| GRAMS_PER_TSP  | Grams per teaspoon          |
+
 
 #### Example
 INGREDIENT,GRAMS_PER_CUP,GRAMS_PER_TBSP,GRAMS_PER_TSP
