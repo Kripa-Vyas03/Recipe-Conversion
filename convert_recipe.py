@@ -290,76 +290,89 @@ def convert_ingredient(amount_ingredient, exclude, toCups, scaling = 1):
         
         return conversion
             
-            
 
 
-def convert_recipe(recipe_file, toCups=False, exclude=None, scaling=1):
+def convert_recipe_lines(lines, toCups=False, exclude=None, scaling=1):
     """
-    Convert all ingredient lines in a recipe file while preserving section headers.
-
-    This function reads a recipe text file line-by-line, detects section headers
-    (e.g., "For the sauce:", "Dough"), and applies `convert_ingredient` only to
-    ingredient lines. Section headers and formatting are preserved.
-
-    A line is treated as a section header if:
-        - It ends with a colon ":" (e.g., "For the filling:")
-        - OR it contains no numeric quantity (heuristic fallback)
+    Convert a list of recipe lines while preserving section structure.
 
     Parameters
     ----------
-    recipe_file : str
-        Path to a text file containing the recipe. The file may include:
-            - Section headers (e.g., "For the sauce:")
-            - Ingredient lines (e.g., "1 cup sugar")
+    lines : list of str
+        Recipe lines (including headers and ingredients).
 
-    toCups : bool, optional (default=False)
-        Direction of conversion:
-            - True: convert from weight (grams) → volume
-            - False: convert from volume → weight (grams)
+    toCups : bool, optional
+        Conversion direction (see `convert_ingredient`).
 
-    exclude : list of str, optional (default=None)
-        List of ingredient names to exclude from conversion.
-        These will still be scaled but not unit-converted.
+    exclude : list of str, optional
+        Ingredients to exclude from conversion.
 
-    scaling : float, optional (default=1)
-        Factor by which to scale all ingredient quantities.
+    scaling : float, optional
+        Scaling factor for ingredient quantities.
 
     Returns
     -------
-    None
-        Prints the converted recipe with preserved structure.
-
+    converted_lines : list of str
+        Converted recipe with original structure preserved.
     """
-
     if exclude is None:
         exclude = []
 
-    # Normalize excluded ingredient names
     exclude = [x.upper() for x in exclude]
 
-    # Read file
-    with open(recipe_file, "r") as f:
-        recipe = f.read().splitlines()
+    converted_lines = []
 
-    # --- Process lines ---
-    for line in recipe:
+    for line in lines:
         stripped = line.strip()
 
         # Preserve empty lines
         if not stripped:
-            print()
+            converted_lines.append("")
             continue
 
-        # If it's a section header → print as-is
+        # Preserve section headers
         if is_section_header(line):
-            print(line)
+            converted_lines.append(line)
             continue
 
-        # Otherwise, treat as ingredient line
+        # Convert ingredient lines
         try:
             conv = convert_ingredient(line, exclude, toCups, scaling)
-            print(conv)
+            converted_lines.append(conv)
         except Exception:
-            # Fallback: if parsing fails, print original line
-            print(line)
+            # Fallback: keep original line if conversion fails
+            converted_lines.append(line)
+
+    return converted_lines
+
+
+def convert_recipe(recipe_file, toCups=False, exclude=None, scaling=1):
+    """
+    Read a recipe file, convert its ingredient lines, and return the result.
+
+    This is a thin wrapper around `convert_recipe_lines` that handles file I/O.
+
+    Parameters
+    ----------
+    recipe_file : str
+        Path to recipe text file.
+
+    toCups : bool, optional
+        Conversion direction.
+
+    exclude : list of str, optional
+        Ingredients to exclude from conversion.
+
+    scaling : float, optional
+        Scaling factor.
+
+    Returns
+    -------
+    converted_recipe : list of str
+        Converted recipe lines.
+    """
+    with open(recipe_file, "r") as f:
+        lines = f.read().splitlines()
+
+    return convert_recipe_lines(lines, toCups, exclude, scaling)
 
