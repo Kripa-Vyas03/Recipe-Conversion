@@ -54,8 +54,8 @@ BUTTER,227,14.2,4.7
 
 ## Installation
 Clone the repository:
-`git clone https://github.com/yourusername/recipe-converter.git
-cd recipe-converter`
+`git clone https://github.com/yourusername/recipe-converter.git`
+`cd recipe-converter`
 
 Install dependencies:
 `pip install numpy pandas`
@@ -65,8 +65,8 @@ Import functions
 `from recipe_converter import convert_recipe`
 
 Convert a recipe
-`converted = convert_recipe("chocolate_pan_cake_volume.txt")
-print("\n".join(converted))`
+`converted = convert_recipe("chocolate_pan_cake_volume.txt")`
+`print("\n".join(converted))`
 
 Convert to cups
 `converted = convert_recipe("chocolate_pan_cake_weight.txt", toCups = True)`
