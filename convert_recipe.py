@@ -4,9 +4,43 @@ from fractions import Fraction
 
 df = pd.read_csv("king_arthur_ingredient_weights2.csv")
 
+def is_section_header(line):
+    """
+    Determine whether a line is a section header.
+
+    A line is considered a header if:
+        - It is empty
+        - It ends with a colon (":")
+        - It contains no numeric characters (heuristic)
+
+    Parameters
+    ----------
+    line : str
+
+    Returns
+    -------
+    bool
+    
+    """
+    stripped = line.strip()
+
+    if not stripped:
+        return True
+
+    if stripped.endswith(":"):
+        return True
+
+    if not any(char.isdigit() for char in stripped):
+        return True
+
+    return False
+
 def make_quant_mask(lst):
     '''
-
+    Makes boolean mask of a list of strings, where True is a quantity (float, integer, fraction)
+    
+    The function checks if each element in the list is an integer/float. If so, the mask element is True. If not, it checks if the element is a fraction (there are two numbers split by a slash, with a demoninator not equal to 0). If so, the mask element is True. If both checks fail, the mask element is False.
+    
     Parameters
     ----------
     lst : list (strings)
@@ -16,14 +50,20 @@ def make_quant_mask(lst):
     -------
     array (bool)
         Mask specifying location of Fractions/floats/integers.
+        
+    Examples
+    --------
+        >>> make_quant_mask(["hello", "there", "are", "1", "1/2", "ducks"])
+            [False, False, False, True, True, False]
 
     '''
     frac_mask = []
     for s in lst:
-        if s.isnumeric():
+        try:
+            float(s)                # check if float/integer
             frac_mask.append(True)
             
-        else:
+        except:            
             values = s.split('/')
             # Check if there are exactly two parts, and both are composed of only digits
             if len(values) == 2 and all(i.isdigit() for i in values):
@@ -48,14 +88,17 @@ def format_num(num, valid_frac):
     If the fractional part is not in the list of valid fractions, the original
     number is returned as a string.
 
-    Args:
+    Parameters
+    ----------
         num (float): The number to format.
 
-    Returns:
+    Returns
+    -------
         str: A string representation of the number as a mixed fraction if valid,
              otherwise the original number as a string.
 
-    Examples:
+    Examples
+    --------
         >>> format_num(1.25)
         '1 1/4'
         >>> format_num(0.5)
@@ -73,7 +116,7 @@ def format_num(num, valid_frac):
         if decimal == 0:
             return str(whole)
         elif whole == 0:
-            return Fraction(decimal)
+            return Fraction(decimal).limit_denominator(10)
         else:
             return f"{whole} {Fraction(decimal)}"
     else:
@@ -86,33 +129,47 @@ valid_frac_tbsp = np.arange(0, 1, 1/8)
 
 def convert_ingredient(amount_ingredient, exclude, toCups, scaling = 1):
     '''
-    Converts ingredient line into weight/volume measurement 
+    Convert a recipe ingredient string between volume and weight units, optionally scaling the quantity. 
     
+    The function parses a string contained an ingredient quantity, measurement, and name (e.g. "1 1/2 cups sugar") and converts between weight (grams) and volume (cups, tablespoons, teaspoons) using lookup values from a reference dataframe (King Arthur Ingredient Weight Chart)
+    
+    Special Cases:
+    - ingredients like "egg" and "yolk" are not converted between units, they are only scaled numerically
+    - Ingredients not found in the King Arthur Ingredient Weight Chart are not converted, only numerically scaled
     
    Parameters
    ----------
-   amount_ingredient : string
-        String with ingredient quantity, measurement, and ingredient name
-        "1.5 cups sugar", "1 1/2 cups sugar", "1.5 cups of sugar", "1 1/2 cups of sugar" all accepted
+   amount_ingredient : str
+        Ingredient string with quantity, measurement, and name. Accepted formats include:
+            - "1.5 cups sugar"
+            - "1 1/2 cups sugar"
+            - "1.5 cups of sugar"
+            - "1 1/2 cups of sugar"
+            - "297 g sugar"
+            - "297 g of sugar"
+        * note that improper fractions (3/2) will not be converted -- future update
         
-    exlude : list [strings]
-        List of ingredients to not convert, strings should be all capitalized
+    exlude : list [str]
+        List of ingredient names to exclude from conversion. These will only be scaled, not converted.
         
     toCups : bool
-        True if you want the conversion from weight -> volume measurement
-        
-    scaling : float
-        If you want to change the amount of the recipe (must be positive)
+        Direction of conversion:
+            - True: convert from weight (grams) → volume (cups/tbsp/tsp)
+            - False: convert from volume (cups/tbsp/tsp) → weight (grams)
+
+    scaling : float, optional (default=1)
+        Factor to scale the ingredient quantity. Must be positive.
    
-   Returns
-   -------
-   conversion : string
-        String with converted ingredient amount
-        
-        
+    Returns
+    -------
+    conversion : str
+        Converted (and/or scaled) ingredient string in a human-readable format.
     '''
+    
+    # ---- initial parsing of input string ----
     amnt_ing = amount_ingredient.split()
     
+    # --- special case: eggs/yolks (no unit conversion) ---
     if "egg" in amount_ingredient or "yolk" in amount_ingredient:
         # If the ingredient is eggs/egg yolks, it assumes you just want to scale it (no volume or weight measurements)        
         num = float(amnt_ing[0]) * scaling
@@ -122,43 +179,54 @@ def convert_ingredient(amount_ingredient, exclude, toCups, scaling = 1):
         return conversion
     
     
-    # ---- break into quantity, measurement, ingredient ----
+    # Convert to numpy array for masking
     amnt_ing = np.array(amnt_ing)
     
+    # Remove trailing empty entries
     if amnt_ing[-1] == " ":
-        amnt_ing = amnt_ing[:-1]        # remove empty space at the end of lines
+        amnt_ing = amnt_ing[:-1]
       
-    # make a mask to separate quantities (floats, ints, fractions) from words
+    # --- Separate numeric quantites from words ---
     mask = make_quant_mask(amnt_ing)
-    # total measured quantity (2 1/4 = 2.25)
+    
+    # Convert quantities (including fractions like "1/2") to floats and sum
     num = sum([float(Fraction(n)) for n in amnt_ing[mask]]) * scaling 
-    # non-quanitity values
+    
+    # extract non-numeric parts (measurement & name)
     words_amnt_ing = amnt_ing[~mask]
-    meas = words_amnt_ing[0]            # assuming that measurement (cups/tbsp/tsp/oz/g) follows after measurement
-
-
-    # -- define ingredient name --
-    if len(amnt_ing) == 2:              # if the ingredient line is two words (3 peaches) -- scale it 
+    
+    # assume first word after quantity is the measurement unit
+    meas = words_amnt_ing[0]
+    
+    
+    # --- Handle simple cases (e.g. "3 peaches")
+    if len(amnt_ing) == 2:               
         ing = amnt_ing[1]
         conversion = f"{num} {ing}"
         return conversion
-
-    elif words_amnt_ing[1] == "of":     # if "of" is in the statement (1.5 cups of sugar) -- exclude from the line
-        words_amnt_ing = words_amnt_ing[1:]
     
+    # Remove "of" if present (e.g. "cups of sugar")
+    elif words_amnt_ing[1] == "of":
+        words_amnt_ing = words_amnt_ing[1:]
+        
+    # Construct ingredient name and normalize to uppercase    
     ing = ' '.join(words_amnt_ing[1:]).upper()    
     
-    if (ing not in df['INGREDIENT'].values) or (ing in exclude):    # if ingredient not in king arthur flour csv or excluded
+    # --- If ingredient is unknown or excluded, only scale (no conversion) ---
+    if (ing not in df['INGREDIENT'].values) or (ing in exclude):
         num = format_num(num, valid_frac_cups)
         conversion = f"{num} {meas} {ing.lower()}"
         return conversion    
                     
-
-    if toCups:                          # if converting from weight -> volume
-        # convert to tsp first
+# ========================
+# CONVERT WEIGHT → VOLUME
+# ========================
+    if toCups:                          
+        # Convert grams → teaspoons using KAF ingredient weight chart
         quantity = round(num/df["GRAMS_PER_TSP"][df["INGREDIENT"] == ing].values[0], 1)
         
-        if quantity >= 11.99:           # if the amount is greater than 1/4 cup
+        # if large enough (greater than 1/4 cup), express in cups
+        if quantity >= 11.99:           
             quantity_cups = round(quantity/48, 2)
             num = format_num(quantity_cups, valid_frac_cups)
             
@@ -166,67 +234,132 @@ def convert_ingredient(amount_ingredient, exclude, toCups, scaling = 1):
             
         
         else:
-            # Convert total quantity (in teaspoons) into whole tablespoons
+            # Convert total teaspoons → tablespoons + remainder
             quantity_tbsp = int(quantity // 3)
-            
-            # Get the fractional remainder after removing whole tablespoons
             tbsp_remainder = quantity % 1
             
-            # Case 1: Fractional tablespoon is valid (e.g., 1/4, 1/2, etc.)
+            # Case 1: Remainder is a "clean" fractional tablespoon 
             if tbsp_remainder in valid_frac_tbsp:
-                frac = Fraction(tbsp_remainder)  # Convert remainder to exact fraction
+                frac = Fraction(tbsp_remainder) 
                 parts = []
-            
-                # Add whole tablespoon part if it exists
+        
                 if quantity_tbsp:
                     parts.append(str(quantity_tbsp))
             
-                # Add fractional part if it exists (non-zero)
                 if frac:
                     parts.append(str(frac))
             
-                # Join parts into a mixed number string (e.g., "1 1/2 tbsp sugar")
                 conversion = f"{' '.join(parts)} tbsp {ing.lower()}"
             
-            # Case 2: Fractional tablespoon is NOT valid → convert remainder to teaspoons
+            # Case 2: Convert remainder → teaspoons
             else:
-                # Remaining teaspoons after removing whole tablespoons
                 quantity_tsp = quantity - (quantity_tbsp * 3)
-            
-                # Convert fractional tsp to nearest 1/8 for cleaner measurement
                 tsp_frac = Fraction(round((quantity_tsp % 1) * 8) / 8)
             
-                # If no whole tablespoons, just show teaspoons
                 if quantity_tbsp:
                     conversion = f"{quantity_tbsp} tbsp + {tsp_frac} tsp {ing.lower()}"
                 else:
                     conversion = f"{tsp_frac} tsp {ing.lower()}"
             
         return conversion
-    
-    else:               # want to convert from cups -> weight
+
+# ========================
+# CONVERT VOLUME → WEIGHT
+# ======================== 
+    else:
+        # Select appropriate conversion factor based on unit
+               
         if meas == "cup" or meas == "cups": 
-            quantity = num*df["GRAMS_PER_CUP"][df["INGREDIENT"] == ing].values[0]           # multiply scaled num by the grams/cups
+            quantity = num*df["GRAMS_PER_CUP"][df["INGREDIENT"] == ing].values[0]       
+            
         elif meas == "tbsp" or meas=='tbsps': 
-            quantity = num*df["GRAMS_PER_TBSP"][df["INGREDIENT"] == ing].values[0]          # multiple scaled num by grams/tbsp
+            quantity = num*df["GRAMS_PER_TBSP"][df["INGREDIENT"] == ing].values[0]      
+            
         elif meas == "tsp" or meas=='tsps':
-            quantity = num*df["GRAMS_PER_TSP"][df["INGREDIENT"] == ing].values[0]           # multiply scaled num by grams/tsp
+            quantity = num*df["GRAMS_PER_TSP"][df["INGREDIENT"] == ing].values[0]      
+            
         elif meas == "fl oz" or meas=='fluid ounces':
-            quantity = num/8 * df["GRAMS_PER_CUP"][df["INGREDIENT"] == ing].values[0]       # multiply fluid ounce by grams/oz
+            quantity = num/8 * df["GRAMS_PER_CUP"][df["INGREDIENT"] == ing].values[0]       
     
         else:
             print('Unvalid measure type. Must be cups, tablespoons, teaspoons, ounces, fluid ounces')
-    
+            
+        # format final output (rounded to 0.1 g)
         conversion = f"{str(round(quantity, 1))} g {ing.lower()}" 
         
         
         return conversion
             
             
-def convert_recipe(recipe_file, toCups = False, exclude = [], scaling = 1):
+
+
+def convert_recipe(recipe_file, toCups=False, exclude=None, scaling=1):
+    """
+    Convert all ingredient lines in a recipe file while preserving section headers.
+
+    This function reads a recipe text file line-by-line, detects section headers
+    (e.g., "For the sauce:", "Dough"), and applies `convert_ingredient` only to
+    ingredient lines. Section headers and formatting are preserved.
+
+    A line is treated as a section header if:
+        - It ends with a colon ":" (e.g., "For the filling:")
+        - OR it contains no numeric quantity (heuristic fallback)
+
+    Parameters
+    ----------
+    recipe_file : str
+        Path to a text file containing the recipe. The file may include:
+            - Section headers (e.g., "For the sauce:")
+            - Ingredient lines (e.g., "1 cup sugar")
+
+    toCups : bool, optional (default=False)
+        Direction of conversion:
+            - True: convert from weight (grams) → volume
+            - False: convert from volume → weight (grams)
+
+    exclude : list of str, optional (default=None)
+        List of ingredient names to exclude from conversion.
+        These will still be scaled but not unit-converted.
+
+    scaling : float, optional (default=1)
+        Factor by which to scale all ingredient quantities.
+
+    Returns
+    -------
+    None
+        Prints the converted recipe with preserved structure.
+
+    """
+
+    if exclude is None:
+        exclude = []
+
+    # Normalize excluded ingredient names
     exclude = [x.upper() for x in exclude]
-    recipe = open(recipe_file, "r").read().splitlines()
-    
-    for i in range(len(recipe)):
-        conv = convert_ingredient(recipe[i], exclude, toCups, scaling)
-        print(conv)
+
+    # Read file
+    with open(recipe_file, "r") as f:
+        recipe = f.read().splitlines()
+
+    # --- Process lines ---
+    for line in recipe:
+        stripped = line.strip()
+
+        # Preserve empty lines
+        if not stripped:
+            print()
+            continue
+
+        # If it's a section header → print as-is
+        if is_section_header(line):
+            print(line)
+            continue
+
+        # Otherwise, treat as ingredient line
+        try:
+            conv = convert_ingredient(line, exclude, toCups, scaling)
+            print(conv)
+        except Exception:
+            # Fallback: if parsing fails, print original line
+            print(line)
+
