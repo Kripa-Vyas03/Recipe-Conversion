@@ -57,31 +57,45 @@ BUTTER,227,14.2,4.7
 
 ## Installation
 Clone the repository:
-`git clone https://github.com/yourusername/recipe-converter.git`
-`cd recipe-converter`
+```
+git clone https://github.com/yourusername/recipe-converter.git
+cd recipe-converter
+```
 
 Install dependencies:
-`pip install numpy pandas`
+```
+pip install numpy pandas
+```
 
 ## Usage
 Import functions
-`from recipe_converter import convert_recipe`
+```
+from recipe_converter import convert_recipe
+```
 
 Convert a recipe
-`converted = convert_recipe("chocolate_pan_cake_volume.txt")`
-`print("\n".join(converted))`
+```
+converted = convert_recipe("chocolate_pan_cake_volume.txt")
+print("\n".join(converted))
+```
 
 Convert to cups
-`converted = convert_recipe("chocolate_pan_cake_weight.txt", toCups = True)`
+```
+converted = convert_recipe("chocolate_pan_cake_weight.txt", toCups = True)
+```
 
 Scale a recipe
-`converted = convert_recipe("chocolate_pan_cake_volume.txt", scaling = 2)`
+```
+converted = convert_recipe("chocolate_pan_cake_volume.txt", scaling = 2)
+```
 
 Exclude ingredients
-`converted = convert_recipe(
+```
+converted = convert_recipe(
     "chocolate_pan_cake_volume.txt",
     exclude=["salt", "granulated sugar"]
-)`
+)
+```
 
 ## How it Works
 1) Parsing
