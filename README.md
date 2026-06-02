@@ -48,8 +48,11 @@ Note that:
 
 #### Example
 INGREDIENT,GRAMS_PER_CUP,GRAMS_PER_TBSP,GRAMS_PER_TSP
+
 SUGAR,200,12.5,4.2
+
 FLOUR,120,7.5,2.5
+
 BUTTER,227,14.2,4.7
 
 ## Installation
